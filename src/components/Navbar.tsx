@@ -26,9 +26,11 @@ import {
   WifiOff,
   Settings,
   Info,
+  Lock,
 } from 'lucide-react';
-import { AppTheme, PatientProfile, SubscriptionInfo } from '../types';
+import { AppTheme, PatientProfile, SubscriptionInfo, AuthUser } from '../types';
 import { useI18n } from '../services/i18n';
+import { authService } from '../services/auth';
 
 interface NavbarProps {
   activeTab: string;
@@ -40,6 +42,9 @@ interface NavbarProps {
   onOpenPremium: () => void;
   subscription: SubscriptionInfo;
   profile: PatientProfile;
+  onOpenAuth: () => void;
+  onOpenConsent: () => void;
+  onOpenCaregiverManager: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -52,9 +57,25 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPremium,
   subscription,
   profile,
+  onOpenAuth,
+  onOpenConsent,
+  onOpenCaregiverManager,
 }) => {
   const { language, setLanguage, t } = useI18n();
   const [is15MenuOpen, setIs15MenuOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(authService.getCurrentUser());
+
+  React.useEffect(() => {
+    const unsub = authService.subscribe(() => {
+      setCurrentUser(authService.getCurrentUser());
+    });
+    return unsub;
+  }, []);
+
+  const pendingRequests = currentUser
+    ? authService.getPendingRequestsForAccount(currentUser.email)
+    : [];
 
   // The 15 Full Pages
   const all15Pages = [
@@ -250,19 +271,139 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {/* Profile trigger */}
-            <button
-              onClick={onOpenProfile}
-              className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 dim:border-slate-700 hover:border-teal-500/50 bg-white dark:bg-slate-800 dim:bg-slate-800 transition-all cursor-pointer"
-              title="View/Edit Patient Profile"
-            >
-              <div className="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 flex items-center justify-center font-bold text-xs">
-                {profile.name.charAt(0)}
-              </div>
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 hidden md:block">
-                {language === 'hi' ? profile.name : profile.name.split(' ')[0]}
-              </span>
-            </button>
+            {/* Profile & Account Authorization Trigger */}
+            <div className="relative">
+              <button
+                onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
+                className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 dim:border-slate-700 hover:border-teal-500/50 bg-white dark:bg-slate-800 dim:bg-slate-800 transition-all cursor-pointer relative"
+                title="Account, Caregiver Permissions & Profile"
+              >
+                <div className="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 flex items-center justify-center font-bold text-xs">
+                  {currentUser?.name?.charAt(0) || profile.name.charAt(0)}
+                </div>
+                <div className="text-left hidden md:block">
+                  <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight">
+                    {currentUser?.name ? currentUser.name.split(' ')[0] : profile.name.split(' ')[0]}
+                  </div>
+                  <span className="text-[9px] text-teal-600 dark:text-teal-400 font-bold block uppercase leading-none">
+                    {currentUser?.provider ? currentUser.provider : 'Account'}
+                  </span>
+                </div>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+
+                {/* Pending Caregiver Request Badge */}
+                {pendingRequests.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black flex items-center justify-center shadow-md animate-pulse">
+                    {pendingRequests.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Account Dropdown Menu */}
+              {isAccountMenuOpen && (
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 dim:bg-slate-800 border border-slate-200 dark:border-slate-800 dim:border-slate-700 shadow-2xl p-2.5 z-50 animate-in fade-in space-y-2">
+                  {/* User Profile Summary */}
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-750 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-slate-900 dark:text-white">
+                        {currentUser?.name || profile.name}
+                      </span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200">
+                        {currentUser?.provider ? `${currentUser.provider}` : 'Guest'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                      {currentUser?.email || 'rajesh.sharma@healthlens.com'}
+                    </div>
+                  </div>
+
+                  {/* Pending Request Banner inside Dropdown */}
+                  {pendingRequests.length > 0 && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+                      <div className="font-bold flex items-center gap-1.5 text-[11px]">
+                        <span>🔔</span>
+                        <span>{pendingRequests.length} Pending Caregiver Request</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          onOpenCaregiverManager();
+                        }}
+                        className="w-full py-1.5 px-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] transition-all cursor-pointer text-center"
+                      >
+                        Review & Approve Permissions
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Menu Action Items */}
+                  <div className="space-y-1 text-xs">
+                    <button
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        onOpenProfile();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium flex items-center gap-2 cursor-pointer"
+                    >
+                      <User className="w-4 h-4 text-teal-600" />
+                      <span>{language === 'hi' ? 'रोगी प्रोफ़ाइल व लक्ष्य' : 'Patient Profile & Goals'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        onOpenCaregiverManager();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-indigo-600" />
+                        <span>{language === 'hi' ? 'केयरगिवर अनुमति एवं ऑडिट लॉग' : 'Caregiver Authorization'}</span>
+                      </span>
+                      {pendingRequests.length > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        onOpenConsent();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium flex items-center gap-2 cursor-pointer"
+                    >
+                      <HelpCircle className="w-4 h-4 text-amber-500" />
+                      <span>{language === 'hi' ? 'अन्य खाते के एक्सेस का अनुरोध' : 'Request Access to Patient'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        onOpenAuth();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-left hover:bg-teal-50 dark:hover:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-bold flex items-center gap-2 cursor-pointer"
+                    >
+                      <Lock className="w-4 h-4" />
+                      <span>{language === 'hi' ? 'साइन इन / खाता बदलें' : 'Sign In / Switch Account'}</span>
+                    </button>
+                  </div>
+
+                  {currentUser?.provider !== 'guest' && (
+                    <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => {
+                          authService.logout();
+                          setIsAccountMenuOpen(false);
+                        }}
+                        className="w-full px-3 py-1.5 rounded-xl text-left text-slate-500 hover:text-rose-600 text-[11px] font-semibold cursor-pointer"
+                      >
+                        {language === 'hi' ? 'साइन आउट' : 'Sign Out'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

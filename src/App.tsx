@@ -57,7 +57,11 @@ import { SettingsPrivacy } from './components/SettingsPrivacy';
 import { PatientProfileModal } from './components/PatientProfileModal';
 import { PremiumModal } from './components/PremiumModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
-import { Sparkles, Check, AlertCircle } from 'lucide-react';
+import { AuthModal } from './components/AuthModal';
+import { AccountConsentModal } from './components/AccountConsentModal';
+import { RequestAccessModal } from './components/RequestAccessModal';
+import { CaregiverAuthorizationManager } from './components/CaregiverAuthorizationManager';
+import { Sparkles, Check, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { notificationService } from './services/notifications';
 import { I18nProvider, useI18n } from './services/i18n';
 
@@ -72,6 +76,10 @@ function AppContent() {
   const [subscription, setSubscription] = useState<SubscriptionInfo>(loadSubscription);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [isRequestAccessModalOpen, setIsRequestAccessModalOpen] = useState(false);
+  const [isCaregiverManagerModalOpen, setIsCaregiverManagerModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Apply theme to HTML root
@@ -321,6 +329,9 @@ function AppContent() {
         onOpenPremium={() => setIsPremiumModalOpen(true)}
         subscription={subscription}
         profile={profile}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenConsent={() => setIsConsentModalOpen(true)}
+        onOpenCaregiverManager={() => setIsCaregiverManagerModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -421,6 +432,8 @@ function AppContent() {
             reminders={reminders}
             history={history}
             onResetDemo={handleResetDemo}
+            onOpenRequestAccessModal={() => setIsRequestAccessModalOpen(true)}
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
           />
         )}
       </main>
@@ -444,6 +457,69 @@ function AppContent() {
         onSelectPlan={handleSelectPlan}
         onSelectModel={handleSelectModel}
       />
+
+      {/* Multiple Login Options Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={(u) => showToast(language === 'hi' ? `${u.name} के रूप में सफलतापूर्वक साइन इन किया गया।` : `Successfully signed in as ${u.name} (${u.provider.toUpperCase()}).`)}
+      />
+
+      {/* Account Owner Consent Modal (Requirement A) */}
+      <AccountConsentModal
+        isOpen={isConsentModalOpen}
+        onClose={() => setIsConsentModalOpen(false)}
+        targetAccountName="Rajesh Sharma"
+        targetAccountEmail="rajesh.sharma@healthlens.com"
+        onContinueWithMyAccount={() => showToast(language === 'hi' ? 'अपने वर्तमान खाते के साथ जारी रखा जा रहा है।' : 'Continuing with your verified account.')}
+        onRequestAccountAccess={() => setIsRequestAccessModalOpen(true)}
+      />
+
+      {/* Request Account Access Modal (Requirement B & C) */}
+      <RequestAccessModal
+        isOpen={isRequestAccessModalOpen}
+        onClose={() => setIsRequestAccessModalOpen(false)}
+        targetAccountEmail="rajesh.sharma@healthlens.com"
+        targetAccountName="Rajesh Sharma"
+        onSubmitted={() => showToast(language === 'hi' ? 'एक्सेस अनुरोध खाता स्वामी को भेजा गया।' : 'Access request submitted to account owner.')}
+      />
+
+      {/* Caregiver Authorization & Permissions Modal */}
+      {isCaregiverManagerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 dim:bg-slate-800 w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 dim:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-teal-900 via-slate-900 to-indigo-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-500 text-white flex items-center justify-center font-black">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    {language === 'hi' ? 'केयरगिवर अनुमति एवं खाता प्राधिकरण' : 'Caregiver Authorization & Access Control'}
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    {language === 'hi' ? 'अनुमतियां प्रबंधित करें, नए अनुरोध स्वीकार/अस्वीकार करें' : 'Grant granular permissions, review requests, and audit history'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCaregiverManagerModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <CaregiverAuthorizationManager
+                onOpenRequestAccessModal={() => {
+                  setIsCaregiverManagerModalOpen(false);
+                  setIsRequestAccessModalOpen(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (

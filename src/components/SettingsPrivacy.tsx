@@ -17,6 +17,8 @@ import { AppTheme, PatientProfile, MedicationItem, HealthReminder, MedicalHistor
 import { useI18n } from '../services/i18n';
 import { notificationService } from '../services/notifications';
 import { speechService } from '../services/speech';
+import { authService } from '../services/auth';
+import { CaregiverAuthorizationManager } from './CaregiverAuthorizationManager';
 
 interface SettingsPrivacyProps {
   theme: AppTheme;
@@ -26,6 +28,8 @@ interface SettingsPrivacyProps {
   reminders: HealthReminder[];
   history: MedicalHistoryRecord[];
   onResetDemo: () => void;
+  onOpenRequestAccessModal?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 export const SettingsPrivacy: React.FC<SettingsPrivacyProps> = ({
@@ -36,9 +40,12 @@ export const SettingsPrivacy: React.FC<SettingsPrivacyProps> = ({
   reminders,
   history,
   onResetDemo,
+  onOpenRequestAccessModal,
+  onOpenAuthModal,
 }) => {
   const { language, setLanguage, t } = useI18n();
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const currentUser = authService.getCurrentUser();
 
   const handleExportData = () => {
     const fullBackup = {
@@ -91,6 +98,50 @@ export const SettingsPrivacy: React.FC<SettingsPrivacyProps> = ({
             ? 'अपनी भाषा प्राथमिकता, थीम, ऑडियो अलर्ट प्रबंधित करें और अपने स्थानीय डेटा को सुरक्षित रूप से डाउनलोड करें।'
             : 'Configure language, display theme, audio chime alerts, and export or wipe your local patient health data.'}
         </p>
+      </div>
+
+      {/* Account Login Status Card */}
+      <div className="bg-white dark:bg-slate-900 dim:bg-slate-800 rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 dim:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 flex items-center justify-center font-black text-lg border border-teal-200 dark:border-teal-800">
+            {currentUser?.name?.charAt(0) || 'G'}
+          </div>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+                {currentUser?.name || 'Guest User'}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200">
+                {currentUser?.provider ? `${currentUser.provider.toUpperCase()} LOGIN` : 'LOCAL GUEST'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+              {currentUser?.email || 'guest@device.local'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {onOpenAuthModal && (
+            <button
+              type="button"
+              onClick={onOpenAuthModal}
+              className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              {currentUser?.provider === 'guest' ? 'Sign In / Register' : 'Switch Account'}
+            </button>
+          )}
+
+          {onOpenRequestAccessModal && (
+            <button
+              type="button"
+              onClick={onOpenRequestAccessModal}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+            >
+              Request Access
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Preferences Section */}
@@ -185,6 +236,11 @@ export const SettingsPrivacy: React.FC<SettingsPrivacyProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Caregiver Authorization & Access History Section */}
+      <CaregiverAuthorizationManager
+        onOpenRequestAccessModal={onOpenRequestAccessModal}
+      />
 
       {/* Data Management & Export */}
       <div className="bg-white dark:bg-slate-900 dim:bg-slate-800 rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 dim:border-slate-700 shadow-sm space-y-5">

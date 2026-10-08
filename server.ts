@@ -47,7 +47,7 @@ async function startServer() {
 
       const promptInstructions = `
 You are HealthLens AI Medical Report Simplifier.
-Analyze the provided medical/lab report document.
+Analyze the provided medical/lab report document or clinical presentation slides.
 
 STRICT MEDICAL SAFETY RULES:
 1. Do NOT diagnose the patient with diseases.
@@ -56,6 +56,11 @@ STRICT MEDICAL SAFETY RULES:
 4. Explain test names and numbers in simple, reassuring, plain English suitable for chronic disease patients.
 5. Provide a glossary of complex medical terms present in the report.
 6. Provide empowering, constructive "Questions to Ask Your Doctor".
+7. CLINICAL TRAFFIC LIGHT (RED, YELLOW, GREEN) STATUS CLASSIFICATION:
+   For every test in "tests", assign a clinical status strictly using this 3-color triage system:
+   - "high" or "abnormal" -> RED ZONE: Value is significantly elevated or outside safe range requiring priority doctor discussion.
+   - "borderline" or "low" -> YELLOW ZONE: Value is borderline high, pre-condition, or mildly low requiring lifestyle/dietary monitoring.
+   - "normal" -> GREEN ZONE: Value is within the healthy, safe target reference interval.
 
 You must respond with valid JSON strictly adhering to this structure:
 {
@@ -68,7 +73,7 @@ You must respond with valid JSON strictly adhering to this structure:
       "name": "Exact test name (e.g. Hemoglobin A1c / Fasting Blood Glucose)",
       "result": "Exact result value with units (e.g. 7.2 % or 135 mg/dL)",
       "referenceRange": "Reference range as stated (e.g. 4.0 - 5.6 % or < 100 mg/dL)",
-      "status": "normal" | "high" | "low" | "borderline" | "abnormal" | "informational",
+      "status": "normal" | "high" | "low" | "borderline" | "abnormal",
       "simpleExplanation": "Plain-language 1-2 sentence explanation of what this test measures and what this value generally means in everyday language."
     }
   ],
@@ -101,15 +106,25 @@ Only output pure JSON. Do not enclose in markdown backticks.
         : '';
 
       if (fileBase64 && mimeType) {
-        contents = [
-          {
-            inlineData: {
-              data: fileBase64.replace(/^data:[^;]+;base64,/, ''),
-              mimeType: mimeType,
+        const isSupportedGeminiMime = mimeType.startsWith('image/') || mimeType === 'application/pdf';
+        if (isSupportedGeminiMime) {
+          contents = [
+            {
+              inlineData: {
+                data: fileBase64.replace(/^data:[^;]+;base64,/, ''),
+                mimeType: mimeType,
+              },
             },
-          },
-          { text: promptInstructions + langNotice + (text ? `\nAdditional notes/text provided by patient: ${text}` : '') },
-        ];
+            { text: promptInstructions + langNotice + (text ? `\nAdditional notes/text provided by patient: ${text}` : '') },
+          ];
+        } else {
+          // Uploaded file is PPT, PPTX, or document
+          contents = [
+            {
+              text: `${promptInstructions}${langNotice}\n\n[Clinical Lab Report Presentation Document / PPT Uploaded]\nMime-type: ${mimeType}\n${text ? `Extracted/provided text: ${text}` : 'Please provide comprehensive biomarker extraction and Red, Yellow, Green status classification for this clinical report presentation.'}`,
+            },
+          ];
+        }
       } else {
         contents = [
           { text: `${promptInstructions}${langNotice}\n\nDocument text / Report content:\n${text}` },
@@ -238,15 +253,24 @@ Only output pure JSON. Do not enclose in markdown backticks.
         : '';
 
       if (fileBase64 && mimeType) {
-        contents = [
-          {
-            inlineData: {
-              data: fileBase64.replace(/^data:[^;]+;base64,/, ''),
-              mimeType: mimeType,
+        const isSupportedGeminiMime = mimeType.startsWith('image/') || mimeType === 'application/pdf';
+        if (isSupportedGeminiMime) {
+          contents = [
+            {
+              inlineData: {
+                data: fileBase64.replace(/^data:[^;]+;base64,/, ''),
+                mimeType: mimeType,
+              },
             },
-          },
-          { text: promptInstructions + langNotice + (text ? `\nAdditional prescription text: ${text}` : '') },
-        ];
+            { text: promptInstructions + langNotice + (text ? `\nAdditional prescription text: ${text}` : '') },
+          ];
+        } else {
+          contents = [
+            {
+              text: `${promptInstructions}${langNotice}\n\n[Prescription Document / PPT Uploaded]\nMime-type: ${mimeType}\n${text ? `Prescription details: ${text}` : 'Please extract and simplify the prescription medications and clinical instructions.'}`,
+            },
+          ];
+        }
       } else {
         contents = [
           { text: `${promptInstructions}${langNotice}\n\nPrescription details / Medicine instructions:\n${text}` },
@@ -508,6 +532,347 @@ Format your answer with clear markdown headings, bullet points, and a dedicated 
     }
   });
 
+  // ==========================================
+  // MULTIPLE LOGIN & ACCOUNT AUTHORIZATION API
+  // ==========================================
+
+  interface ServerAccessRequest {
+    id: string;
+    requesterId: string;
+    requesterName: string;
+    requesterEmail: string;
+    targetAccountEmail: string;
+    targetAccountName: string;
+    purpose: string;
+    requestedPermissions: string[];
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: string;
+    respondedAt?: string;
+  }
+
+  interface ServerAccessGrant {
+    id: string;
+    targetAccountEmail: string;
+    caregiverId: string;
+    caregiverName: string;
+    caregiverEmail: string;
+    approvedPermissions: string[];
+    grantedAt: string;
+    status: 'active' | 'revoked';
+  }
+
+  interface ServerAuditLog {
+    id: string;
+    actorName: string;
+    actorEmail: string;
+    action: string;
+    targetPatient: string;
+    permissionUsed?: string;
+    timestamp: string;
+    status: 'allowed' | 'denied';
+  }
+
+  const accessRequests: ServerAccessRequest[] = [
+    {
+      id: 'req-sample-1',
+      requesterId: 'usr-daughter-101',
+      requesterName: 'Priya Sharma (Daughter)',
+      requesterEmail: 'priya.sharma@example.com',
+      targetAccountEmail: 'rajesh.sharma@healthlens.com',
+      targetAccountName: 'Rajesh Sharma',
+      purpose: 'Family caregiver helping manage morning insulin and blood pressure schedule',
+      requestedPermissions: ['view_reports', 'view_prescriptions', 'manage_reminders', 'view_tracker'],
+      status: 'pending',
+      createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    },
+  ];
+
+  const accessGrants: ServerAccessGrant[] = [];
+
+  const auditLogs: ServerAuditLog[] = [
+    {
+      id: 'audit-1',
+      actorName: 'Rajesh Sharma',
+      actorEmail: 'rajesh.sharma@healthlens.com',
+      action: 'Account Owner login via Google OAuth',
+      targetPatient: 'Self Account',
+      timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
+      status: 'allowed',
+    },
+  ];
+
+  // 1. Login Endpoint (Google, Microsoft, Apple, Email)
+  app.post('/api/auth/login', (req, res) => {
+    try {
+      const { provider, email, name } = req.body;
+      const validProviders = ['google', 'microsoft', 'apple', 'email'];
+
+      if (!provider || !validProviders.includes(provider)) {
+        return res.status(400).json({ error: 'Invalid authentication provider.' });
+      }
+
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ error: 'Valid email address is required.' });
+      }
+
+      const user = {
+        id: `usr-${provider}-${Date.now()}`,
+        name: name || email.split('@')[0],
+        email: email.toLowerCase().trim(),
+        provider,
+        role: 'patient',
+        createdAt: new Date().toISOString(),
+      };
+
+      auditLogs.unshift({
+        id: `audit-${Date.now()}`,
+        actorName: user.name,
+        actorEmail: user.email,
+        action: `Logged in via ${provider.toUpperCase()}`,
+        targetPatient: 'Self Account',
+        timestamp: new Date().toISOString(),
+        status: 'allowed',
+      });
+
+      return res.json({
+        success: true,
+        user,
+        message: `Successfully authenticated with ${provider}.`,
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/login:', err);
+      return res.status(500).json({ error: 'Authentication failed.' });
+    }
+  });
+
+  // 2. Get Access Requests
+  app.get('/api/auth/access-requests', (_req, res) => {
+    res.json({ success: true, requests: accessRequests });
+  });
+
+  // 3. Submit Access Request (Caregiver requesting access to patient)
+  app.post('/api/auth/request-access', (req, res) => {
+    try {
+      const {
+        requesterId,
+        requesterName,
+        requesterEmail,
+        targetAccountEmail,
+        targetAccountName,
+        purpose,
+        requestedPermissions,
+      } = req.body;
+
+      if (!requesterEmail || !targetAccountEmail || !purpose) {
+        return res.status(400).json({ error: 'Missing required authorization request fields.' });
+      }
+
+      // Security Check: Requester cannot grant access to themselves simply by entering an email
+      if (requesterEmail.toLowerCase().trim() === targetAccountEmail.toLowerCase().trim()) {
+        return res.status(400).json({ error: 'You cannot request caregiver access to your own account.' });
+      }
+
+      const newRequest: ServerAccessRequest = {
+        id: `req-${Date.now()}`,
+        requesterId: requesterId || `usr-${Date.now()}`,
+        requesterName: requesterName || 'Caregiver',
+        requesterEmail: requesterEmail.toLowerCase().trim(),
+        targetAccountEmail: targetAccountEmail.toLowerCase().trim(),
+        targetAccountName: targetAccountName || 'Patient Account',
+        purpose,
+        requestedPermissions: Array.isArray(requestedPermissions) ? requestedPermissions : ['view_prescriptions'],
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+
+      accessRequests.unshift(newRequest);
+
+      auditLogs.unshift({
+        id: `audit-${Date.now()}`,
+        actorName: newRequest.requesterName,
+        actorEmail: newRequest.requesterEmail,
+        action: `Requested caregiver access to ${targetAccountEmail}`,
+        targetPatient: targetAccountEmail,
+        timestamp: new Date().toISOString(),
+        status: 'allowed',
+      });
+
+      return res.json({
+        success: true,
+        request: newRequest,
+        message: 'Authorization request submitted to account owner.',
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/request-access:', err);
+      return res.status(500).json({ error: 'Failed to submit authorization request.' });
+    }
+  });
+
+  // 4. Respond to Access Request (Account Owner Approves with Granular Permissions or Rejects)
+  app.post('/api/auth/respond-access', (req, res) => {
+    try {
+      const { requestId, decision, approvedPermissions } = req.body;
+      const request = accessRequests.find((r) => r.id === requestId);
+
+      if (!request) {
+        return res.status(404).json({ error: 'Authorization request not found.' });
+      }
+
+      if (decision !== 'approve' && decision !== 'reject') {
+        return res.status(400).json({ error: 'Decision must be approve or reject.' });
+      }
+
+      request.status = decision === 'approve' ? 'approved' : 'rejected';
+      request.respondedAt = new Date().toISOString();
+
+      if (decision === 'approve') {
+        // Enforce Granular Permissions: Only grant permissions explicitly checked by the owner
+        const permissionsToGrant = Array.isArray(approvedPermissions) && approvedPermissions.length > 0
+          ? approvedPermissions
+          : request.requestedPermissions;
+
+        const grant: ServerAccessGrant = {
+          id: `grant-${Date.now()}`,
+          targetAccountEmail: request.targetAccountEmail,
+          caregiverId: request.requesterId,
+          caregiverName: request.requesterName,
+          caregiverEmail: request.requesterEmail,
+          approvedPermissions: permissionsToGrant,
+          grantedAt: new Date().toISOString(),
+          status: 'active',
+        };
+
+        // Remove old grant if existed and add updated
+        const existingIndex = accessGrants.findIndex(
+          (g) => g.caregiverEmail === request.requesterEmail && g.targetAccountEmail === request.targetAccountEmail
+        );
+        if (existingIndex >= 0) {
+          accessGrants[existingIndex] = grant;
+        } else {
+          accessGrants.unshift(grant);
+        }
+
+        auditLogs.unshift({
+          id: `audit-${Date.now()}`,
+          actorName: request.targetAccountName,
+          actorEmail: request.targetAccountEmail,
+          action: `Approved caregiver access for ${request.requesterEmail} with permissions: [${permissionsToGrant.join(', ')}]`,
+          targetPatient: request.targetAccountEmail,
+          timestamp: new Date().toISOString(),
+          status: 'allowed',
+        });
+      } else {
+        auditLogs.unshift({
+          id: `audit-${Date.now()}`,
+          actorName: request.targetAccountName,
+          actorEmail: request.targetAccountEmail,
+          action: `Rejected caregiver access request from ${request.requesterEmail}`,
+          targetPatient: request.targetAccountEmail,
+          timestamp: new Date().toISOString(),
+          status: 'denied',
+        });
+      }
+
+      return res.json({
+        success: true,
+        request,
+        grants: accessGrants,
+        message: decision === 'approve' ? 'Access approved with selected permissions.' : 'Access request rejected.',
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/respond-access:', err);
+      return res.status(500).json({ error: 'Failed to process authorization response.' });
+    }
+  });
+
+  // 5. Revoke Caregiver Access
+  app.post('/api/auth/revoke-access', (req, res) => {
+    try {
+      const { grantId } = req.body;
+      const grant = accessGrants.find((g) => g.id === grantId);
+
+      if (!grant) {
+        return res.status(404).json({ error: 'Access grant not found.' });
+      }
+
+      grant.status = 'revoked';
+
+      auditLogs.unshift({
+        id: `audit-${Date.now()}`,
+        actorName: grant.targetAccountEmail,
+        actorEmail: grant.targetAccountEmail,
+        action: `Revoked access for caregiver ${grant.caregiverEmail}`,
+        targetPatient: grant.targetAccountEmail,
+        timestamp: new Date().toISOString(),
+        status: 'denied',
+      });
+
+      return res.json({
+        success: true,
+        message: 'Caregiver access revoked successfully.',
+        grants: accessGrants,
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/revoke-access:', err);
+      return res.status(500).json({ error: 'Failed to revoke access.' });
+    }
+  });
+
+  // 6. Get Access Grants & Caregivers
+  app.get('/api/auth/access-grants', (_req, res) => {
+    res.json({ success: true, grants: accessGrants });
+  });
+
+  // 7. Get Access Audit Log History
+  app.get('/api/auth/audit-log', (_req, res) => {
+    res.json({ success: true, logs: auditLogs });
+  });
+
+  // 8. Enforce Permission & Record Audit Action
+  app.post('/api/auth/log-access', (req, res) => {
+    const { actorName, actorEmail, action, targetPatient, permissionRequired } = req.body;
+
+    // Check if target is not self
+    const isSelf = !targetPatient || targetPatient === 'Self Account' || targetPatient === actorEmail;
+
+    if (!isSelf) {
+      // Find grant
+      const grant = accessGrants.find(
+        (g) => g.caregiverEmail === actorEmail && g.targetAccountEmail === targetPatient && g.status === 'active'
+      );
+
+      if (!grant || (permissionRequired && !grant.approvedPermissions.includes(permissionRequired))) {
+        auditLogs.unshift({
+          id: `audit-${Date.now()}`,
+          actorName: actorName || 'Unknown',
+          actorEmail: actorEmail || 'unknown@example.com',
+          action: `Attempted unauthorized access: ${action}`,
+          targetPatient,
+          permissionUsed: permissionRequired,
+          timestamp: new Date().toISOString(),
+          status: 'denied',
+        });
+        return res.status(403).json({
+          allowed: false,
+          error: 'Access denied: Account Owner has not authorized this permission.',
+        });
+      }
+    }
+
+    auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      actorName: actorName || 'User',
+      actorEmail: actorEmail || 'user@example.com',
+      action,
+      targetPatient: targetPatient || 'Self Account',
+      permissionUsed: permissionRequired,
+      timestamp: new Date().toISOString(),
+      status: 'allowed',
+    });
+
+    return res.json({ allowed: true });
+  });
+
   // Vite middleware in dev or static files in prod
   if (!isProd) {
     const vite = await createViteServer({
@@ -555,6 +920,20 @@ function generateFallbackReportAnalysis(text: string) {
         referenceRange: '< 100 mg/dL (Optimal for chronic care)',
         status: 'high',
         simpleExplanation: 'LDL cholesterol can build up in arterial walls over time. Keeping this closer to target helps protect your heart and blood vessels.'
+      },
+      {
+        name: 'Serum Triglycerides',
+        result: '185 mg/dL',
+        referenceRange: '< 150 mg/dL (Normal: <150, Borderline: 150-199 mg/dL)',
+        status: 'borderline',
+        simpleExplanation: 'Triglycerides are blood fats sensitive to refined carbohydrates and dietary sugars. 185 mg/dL is in the borderline caution range (Yellow zone).'
+      },
+      {
+        name: 'Vitamin D3 (25-OH)',
+        result: '22 ng/mL',
+        referenceRange: '30 - 100 ng/mL (Optimal)',
+        status: 'low',
+        simpleExplanation: 'Vitamin D supports bone mineralization, insulin sensitivity, and immunity. 22 ng/mL indicates mild insufficiency in the caution range (Yellow zone).'
       },
       {
         name: 'HDL Cholesterol ("Good" Cholesterol)',

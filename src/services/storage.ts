@@ -197,11 +197,25 @@ export const DEFAULT_SAMPLE_REPORT: MedicalReportAnalysis = {
       simpleExplanation: 'LDL can slowly build up on blood vessel walls. Keeping this closer to the 100 mg/dL target helps keep your heart healthy.'
     },
     {
+      name: 'Serum Triglycerides',
+      result: '185 mg/dL',
+      referenceRange: '< 150 mg/dL (Normal: <150, Borderline: 150-199 mg/dL)',
+      status: 'borderline',
+      simpleExplanation: 'Triglycerides are blood fats sensitive to refined carbohydrates and dietary sugars. 185 mg/dL is in the borderline caution range (Yellow zone).'
+    },
+    {
+      name: 'Vitamin D3 (25-OH)',
+      result: '22 ng/mL',
+      referenceRange: '30 - 100 ng/mL (Optimal)',
+      status: 'low',
+      simpleExplanation: 'Vitamin D supports bone mineralization, insulin sensitivity, and immunity. 22 ng/mL indicates mild insufficiency in the caution range (Yellow zone).'
+    },
+    {
       name: 'HDL Cholesterol ("Good" Cholesterol)',
       result: '46 mg/dL',
       referenceRange: '> 40 mg/dL (Desirable)',
       status: 'normal',
-      simpleExplanation: 'HDL carries excess cholesterol back to your liver to be eliminated. Your reading is in the healthy reference range.'
+      simpleExplanation: 'HDL carries excess cholesterol back to your liver to be eliminated. Your reading is in the healthy reference range (Green zone).'
     },
     {
       name: 'Serum Creatinine',

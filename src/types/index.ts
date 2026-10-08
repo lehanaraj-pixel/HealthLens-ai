@@ -161,3 +161,58 @@ export interface SubscriptionInfo {
   activatedAt?: string;
   expiresAt?: string;
 }
+
+export type AuthProviderType = 'google' | 'microsoft' | 'apple' | 'email' | 'guest';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  provider: AuthProviderType;
+  avatarUrl?: string;
+  role?: 'patient' | 'caregiver';
+  createdAt: string;
+}
+
+export type GranularPermission =
+  | 'view_reports'
+  | 'view_prescriptions'
+  | 'manage_reminders'
+  | 'view_history'
+  | 'view_tracker';
+
+export interface AccessRequest {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  targetAccountEmail: string;
+  targetAccountName: string;
+  purpose: string;
+  requestedPermissions: GranularPermission[];
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  respondedAt?: string;
+}
+
+export interface AccessGrant {
+  id: string;
+  targetAccountEmail: string;
+  caregiverId: string;
+  caregiverName: string;
+  caregiverEmail: string;
+  approvedPermissions: GranularPermission[];
+  grantedAt: string;
+  status: 'active' | 'revoked';
+}
+
+export interface AccessAuditLog {
+  id: string;
+  actorName: string;
+  actorEmail: string;
+  action: string;
+  targetPatient: string;
+  permissionUsed?: GranularPermission;
+  timestamp: string;
+  status: 'allowed' | 'denied';
+}
