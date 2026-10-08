@@ -1,0 +1,6 @@
+{
+  "name": "HealthLens",
+  "description": "Self-Care Prescription Tracker and Medical Report Simplifier for chronic disease patients.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

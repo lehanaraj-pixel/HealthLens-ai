@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Dim theme override */
+[data-theme="dim"] body {
+  background-color: #0b1120 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dim"] header {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dim"] .bg-white {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dim"] .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dim"] .border-slate-200,
+[data-theme="dim"] .border-slate-200\/90,
+[data-theme="dim"] .border-slate-200\/80,
+[data-theme="dim"] .border-slate-200\/70,
+[data-theme="dim"] .border-slate-100 {
+  border-color: #334155 !important;
+}
+
+[data-theme="dim"] .bg-slate-50,
+[data-theme="dim"] .bg-slate-50\/70,
+[data-theme="dim"] .bg-slate-50\/60,
+[data-theme="dim"] .bg-slate-50\/50 {
+  background-color: #1e293b80 !important;
+}
+
+[data-theme="dim"] input,
+[data-theme="dim"] textarea,
+[data-theme="dim"] select {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+/* Dark theme override */
+[data-theme="dark"] body {
+  background-color: #030712 !important;
+  color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] header {
+  background-color: rgba(3, 7, 18, 0.95) !important;
+  border-color: #1f2937 !important;
+}
+
+[data-theme="dark"] .bg-white {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+[data-theme="dark"] .text-slate-900 {
+  color: #f9fafb !important;
+}
+
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-slate-200\/90,
+[data-theme="dark"] .border-slate-200\/80,
+[data-theme="dark"] .border-slate-200\/70,
+[data-theme="dark"] .border-slate-100 {
+  border-color: #1f2937 !important;
+}
+
+[data-theme="dark"] .bg-slate-50,
+[data-theme="dark"] .bg-slate-50\/70,
+[data-theme="dark"] .bg-slate-50\/60,
+[data-theme="dark"] .bg-slate-50\/50 {
+  background-color: #11182780 !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: #030712 !important;
+  color: #f9fafb !important;
+  border-color: #374151 !important;
+}
+
+/* Smooth transitions */
+button, a {
+  cursor: pointer;
+}
